@@ -35,7 +35,7 @@ buttons:
   login  : Sign in
 
 modules:
-  cmsusers:
+  CMSUser:
     title   : Users
     desc    : Users. User accounts management.
     icon    : user
@@ -47,7 +47,7 @@ modules:
     delete  : Delete User
     export  : Export Users
     hidden  : true
-  cmsuserroles:
+  CMSUserRole:
     title   : User Roles
     desc    : Definition and management of access levels.
     icon    : cog
@@ -58,7 +58,7 @@ modules:
     delete  : Delete Role
     export  : Export User Roles
     hidden  : true
-  account:
+  Account:
     title   : Account
     desc    : Manage account profile data.
     icon    : user
@@ -68,7 +68,7 @@ modules:
     export  : Export Account data
     credentials: Credentials
     hidden  : true
-  cmshelp:
+  CMSHelp:
     title   : Help
     desc    : User manual for working with the CMS.
     icon    : flag
@@ -186,7 +186,7 @@ navigation_groups:
     title: CMS Settings
     icon : cog
     modules:
-      - account
-      - cmsusers
-      - cmsuserroles
-      - cmshelp
+      - Account
+      - CMSUsers
+      - CMSUserRoles
+      - CMShelp

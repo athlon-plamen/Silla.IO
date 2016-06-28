@@ -33,11 +33,11 @@ namespace Core {
     /**
      * For easier access to Router.
      *
-     * @return Modules\Router\Router
+     * @return Modules\Http\Router
      */
     function Router()
     {
-        return Modules\Router\Router::getInstance();
+        return Modules\Http\Router::getInstance();
     }
 
     /**
@@ -48,6 +48,16 @@ namespace Core {
     function Registry()
     {
         return Modules\Registry\Registry::getInstance();
+    }
+
+    /**
+     * For easier access to Inflection tools.
+     *
+     * @return Modules\Inflection\Inflection
+     */
+    function Inflection()
+    {
+        return Modules\Inflection\Inflection::getInstance();
     }
 
     /**

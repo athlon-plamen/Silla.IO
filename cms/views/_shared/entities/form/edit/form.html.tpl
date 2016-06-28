@@ -17,7 +17,7 @@
         </ul>
     </div>
 </div>
-{form action={url resource=$resource action="{if $resource->exists()}update{else}create{/if}"} method="{if $resource->exists()}patch{else}post{/if}" role='form' class='data-form form-horizontal' accept-charset='UTF-8' upload={'Core\Utils::arraySearchRecursive'|call_user_func_array:[['file', 'photo'], $_labels.attributes]}}
+{form action={url resource=$resource action='update'} method="patch" role='form' class='data-form form-horizontal' accept-charset='UTF-8' upload={'Core\Utils::arraySearchRecursive'|call_user_func_array:[['file', 'photo'], $_labels.attributes]}}
     <div class="tab-content">
     {foreach from=$sections key=section_key item=section name=form_sections_contents}
         <div class="tab-pane {if $smarty.foreach.form_sections_contents.first} in active{/if}" id="form-section-{$section_key}">

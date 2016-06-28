@@ -12,8 +12,8 @@
         <div id="collapse-module-{$module}" class="panel-collapse collapse{if $_controller eq $module} in{/if}">
             <div class="panel-body no-border">
                 <ul class="list-unstyled no-margin">
-                    <li{if $_controller eq $module and $_action eq 'index'} class="active"{/if}><a href="{link_to controller=$module}"><i class="glyphicon glyphicon-align-justify"></i> {$_labels.modules.$module.index}</a></li>
-                    {if {user_can controller=$module action=create}}<li{if $_controller eq $module and $_action eq 'create'} class="active"{/if}><a href="{link_to controller=$module action=create}"><i class="glyphicon glyphicon-plus"></i> {$_labels.modules.$module.create}</a></li>{/if}
+                    <li{if $_controller eq $module and $_action eq 'index'} class="active"{/if}><a href="{url for="{$module}.browse"}"><i class="glyphicon glyphicon-align-justify"></i> {$_labels.modules.$module.index}</a></li>
+                    {if {user_can controller=$module action=create}}<li{if $_controller eq $module and $_action eq 'create'} class="active"{/if}><a href="{url for="{$module}.add"}"><i class="glyphicon glyphicon-plus"></i> {$_labels.modules.$module.create}</a></li>{/if}
                 </ul>
             </div>
         </div>
@@ -36,7 +36,7 @@
                 {foreach from=$group.modules item=submodule}
                     {if {user_can controller=$submodule action=index}}
                     <li{if $_controller eq $submodule} class="active"{/if}>
-                        <a href="{link_to controller=$submodule}">
+                        <a href="{url for="{$submodule}.browse"}">
                             <i class="glyphicon glyphicon-{$_labels.modules.$submodule.icon}"></i> {$_labels.modules.$submodule.title}
                         </a>
                     </li>

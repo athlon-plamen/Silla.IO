@@ -9,9 +9,10 @@
  * @license    http://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3.0 (GPLv3)
  */
 
-namespace Core\Modules\Router;
+namespace Core\Modules\Http;
 
 use Core;
+use Aura;
 
 /**
  * Router Class definition.
@@ -22,7 +23,6 @@ final class Router
      * Request object.
      *
      * @var Request
-     * @access public
      */
     public $request;
 
@@ -30,7 +30,6 @@ final class Router
      * Response object.
      *
      * @var Response
-     * @access public
      */
     public $response;
 
@@ -38,7 +37,6 @@ final class Router
      * Reference to the current instance of the Routes object.
      *
      * @var Router
-     * @access private
      * @static
      */
     private static $instance = null;
@@ -47,34 +45,38 @@ final class Router
      * All routing routes container.
      *
      * @var Routes
-     * @access private
      */
     private $routes;
 
     /**
+     * @var Aura\Router\Router
+     */
+    private $router;
+
+    /**
      * Filters all input.
-     *
-     * @access private
      */
     private function __construct()
     {
         if (get_magic_quotes_gpc()) {
             self::disableMagicQuotes();
         }
+
+        $routerFactory = new Aura\Router\RouterFactory;
+        $this->router = $routerFactory->newInstance();
     }
 
     /**
      * Dispatches the processed request.
      *
-     * @param Request $request Router Request object.
-     * @param Routes  $routes  Router Routes object.
+     * @param Request                      $request Router Request object.
+     * @param Aura\Router\RouteCollection  $routes  Collection of routes.
      *
-     * @access public
      * @throws \InvalidArgumentException Request token does not match.
      *
      * @return void
      */
-    public function dispatch(Request &$request, Routes &$routes)
+    public function dispatch(Request $request, Aura\Router\RouteCollection $routes)
     {
         $this->routes  = $routes;
         $this->request = $request;
@@ -91,6 +93,16 @@ final class Router
             $this->response->setHttpResponseCode(403);
             throw new \InvalidArgumentException('Request token does not match.');
         }
+
+        $this->router->setRoutes($routes);
+
+        if ($request->is('post') && $request->post('_method')) {
+            $request->setMethod($request->post('_method'));
+        }
+        
+        $route = $this->match($request);
+
+        $request->setRoutedElements($route->params);
 
         $namespace = $request->mode('namespace');
 
@@ -110,16 +122,48 @@ final class Router
             $this->response->setContent($controller->renderer->getOutput());
             $this->response->addHeader('Content-Type: ' . $controller->renderer->getOutputContentType());
         } else {
+
             Core\Base\Controller::resourceNotFound($request);
         }
     }
+
+    /**
+     * Matches a routing route.
+     *
+     * @param \Core\Modules\Http\Request $request
+     * 
+     * @throws \RuntimeException When matching failed.
+     *
+     * @return \Aura\Router\Route|false
+     */
+    private function match(Request $request)
+    {
+        $route = $this->router->match($request->path(), $request->meta());
+
+        if (!$route) {
+            $failure = $this->router->getFailedRoute();
+
+            if ($failure->failedMethod()) {
+                $this->response->setHttpResponseCode(405);
+                throw new \RuntimeException('The route matching failed on the allowed HTTP methods.');
+            } elseif ($failure->failedAccept()) {
+                $this->response->setHttpResponseCode(406);
+                throw new \RuntimeException('The route matching failed on the available content-types.');
+            } else {
+                $this->response->setHttpResponseCode(404);
+                throw new \RuntimeException('The route does not exist.');
+            }
+        }
+
+        return $route;
+    }
+
 
     /**
      * Generates an application url.
      *
      * @param array $options Array of options.
      *
-     * @access public
      * @uses   Core\Registry();
      * @uses   Core\Config();
      *
@@ -129,37 +173,33 @@ final class Router
     {
         static $_cache;
 
-        $_cache_key = md5(serialize($options));
-
-        $options = array_merge(array('controller' => $this->request->controller()), $options);
+        $_cache_key = md5(json_encode($options));
 
         if (!isset($_cache[$_cache_key])) {
             $mode = isset($options['_mode']) ? Core\Config()->modes($options['_mode']) : $this->request->mode();
+            unset($options['_mode']);
 
             if ($mode != $this->request->mode()) {
-                $routes = new Routes($mode);
-                unset($options['_mode']);
+                $namespace = $this->request->mode('namespace');
+                $routes = "\\{$namespace}\\Configuration\\Routes";
 
-                $route = $routes->extractUrl($options);
-                $route['pattern'] = $routes->toRoute($route['pattern']);
-            } else {
-                unset($options['_mode']);
-                $route = $this->routes->extractUrl($options);
-                $route['pattern'] = $this->routes->toRoute($route['pattern']);
+                $this->router->setRoutes(new $routes());
             }
 
-            foreach ($route['pattern'] as $key => $url_element) {
-                if (isset($url_element{0}) && ($url_element{0} === Core\Config()->ROUTER['variables_prefix'])) {
-                    $option_key = str_replace(Core\Config()->ROUTER['variables_prefix'], '', $url_element);
-                    $options[$option_key] = isset($options[$option_key]) ? $options[$option_key] : null;
+            $route = isset($options['for']) ? $options['for'] : 'default';
+            $options['format'] = isset($options['format']) ? $options['format'] : '';
+            $options['id'] = isset($options['id']) ? $options['id'] : '';
 
-                    $route['pattern'][$key] = $options[$option_key];
-                }
-            }
+            unset($options['for']);
 
-            foreach ($options as $key => $option) {
-                if (array_key_exists($key, $route['maps_to'])) {
-                    unset($options[$key]);
+            if (isset($options['resource']) && !empty($options['resource'])) {
+                $resource = new \ReflectionClass(get_class($options['resource']));
+                if (isset($options['action']) && !empty($options['action'])) {
+                    $options['id'] = $options['resource']->{$options['resource']::primaryKeyField()};
+                    $options['resource'] = $resource->getShortName();
+                    $route = "{$options['resource']}.{$options['action']}";
+                } else {
+                    $route = "{$options['resource']}.read";
                 }
             }
 
@@ -173,16 +213,8 @@ final class Router
                 $_prefix = '?';
             }
 
-            $mode['url'] = $mode['url'] ? $mode['url'] . Core\Config()->ROUTER['separator'] : '';
-
-            $_cache[$_cache_key] =
-                $_prefix . $mode['url'] . rtrim(
-                    implode(
-                        Core\Config()->ROUTER['separator'],
-                        $route['pattern']
-                    ),
-                    Core\Config()->ROUTER['separator']
-                ) . ((!empty($options)) ? '?' . http_build_query($options, false, '&amp;') : '');
+            $route = htmlspecialchars($this->router->generate($route, $options), ENT_QUOTES, 'UTF-8');
+            $_cache[$_cache_key] = $_prefix . $mode['url'] . $route;
         }
 
         return $_cache[$_cache_key];
@@ -193,7 +225,6 @@ final class Router
      *
      * @param array $options Array of options.
      *
-     * @access public
      * @uses   toUrl
      * @uses   Core\Config();
      *
@@ -206,10 +237,6 @@ final class Router
 
     /**
      * Returns an instance of the router object.
-     *
-     * @access public
-     * @final
-     * @static
      *
      * @return Router
      */
@@ -224,8 +251,6 @@ final class Router
 
     /**
      * Cloning of Router is disallowed.
-     *
-     * @access public
      *
      * @return void
      */
@@ -242,7 +267,6 @@ final class Router
      * @param integer $duration Time before expiration in milliseconds.
      * @param boolean $raw      Whether to use raw cookie storage.
      *
-     * @access public
      * @uses   Core\Config()
      *
      * @return boolean
@@ -265,7 +289,6 @@ final class Router
      *
      * @param string $name Name of the cookie to remove.
      *
-     * @access public
      * @uses   Core\Config()
      *
      * @return boolean
@@ -310,7 +333,6 @@ final class Router
      * @param string $httpRequestString Request string.
      * @param Routes $routes            Request routing routes.
      *
-     * @static
      * @uses Core\Utils::parseHttpRequestString()
      *
      * @return array
@@ -331,25 +353,11 @@ final class Router
 
         $requestElements = Core\Utils::parseHttpRequestString($httpRequestString, Core\Config()->ROUTER['separator']);
 
-        $route     = $routes->extractRoute($requestElements);
-        $routedUrl = $routes->toRoute($route['pattern']);
-        $elements  = $route['maps_to'];
-
-        foreach ($route['maps_to'] as $role => $value) {
-            if ('*' === $value) {
-                $_element = array_search(Core\Config()->ROUTER['variables_prefix'] . $role, $routedUrl);
-                $elements[$role] = isset($requestElements[$_element]) ? $requestElements[$_element] : null;
-            }
-        }
-
-        return $elements;
+        return $requestElements;
     }
 
     /**
      * Disabling magic quotes at runtime.
-     *
-     * @access public
-     * @static
      *
      * @return void
      */

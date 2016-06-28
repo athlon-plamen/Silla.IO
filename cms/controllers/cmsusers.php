@@ -13,7 +13,7 @@ namespace CMS\Controllers;
 
 use Core;
 use Core\Base;
-use Core\Modules\Router\Request;
+use Core\Modules\Http\Request;
 use Core\Modules\Crypt\Crypt;
 use CMS\Models;
 use CMS\Helpers;
@@ -29,49 +29,6 @@ class CMSUsers extends CMS
      * @var string
      */
     protected $resourceModel = 'CMS\Models\CMSUser';
-
-    /**
-     * Additional validation rules to ensure password confirmation.
-     *
-     * @inheritdoc
-     */
-    protected function beforeCreate(Request $request)
-    {
-        parent::beforeCreate($request);
-
-        /* Remove current password validation. */
-        unset(
-            $this->sections['general']['fields']['current_password'],
-            $this->sections['credentials']['fields']['current_password']
-        );
-
-        if ($request->is('post')) {
-            if ($request->post('password') !== $request->post('password_confirm')) {
-                $this->resource->setError('password_confirm', 'mismatch');
-            }
-        }
-    }
-
-
-    /**
-     * Additional validation rules to ensure user is authorized to edit this resource.
-     *
-     * @inheritdoc
-     */
-    protected function beforeEdit(Request $request)
-    {
-        parent::beforeEdit($request);
-
-        if ($request->is('post')) {
-            if (!Crypt::hashCompare($this->user->password, $request->post('current_password'))) {
-                $this->resource->setError('current_password', 'mismatch');
-            }
-
-            if ($request->post('password') !== $request->post('password_confirm')) {
-                $this->resource->setError('password_confirm', 'mismatch');
-            }
-        }
-    }
 
     /**
      * Change access credentials action.
@@ -96,6 +53,67 @@ class CMSUsers extends CMS
 
         if ($request->is('post') && !$this->resource->hasErrors()) {
             $request->redirectTo('index');
+        }
+    }
+
+    /**
+     * Additional validation rules to ensure password confirmation.
+     *
+     * @inheritdoc
+     */
+    protected function beforeAdd(Request $request)
+    {
+        parent::beforeAdd($request);
+
+        /* Remove current password validation. */
+        unset(
+            $this->sections['general']['fields']['current_password'],
+            $this->sections['credentials']['fields']['current_password']
+        );
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function beforeCreate(Request $request)
+    {
+        $this->beforeAdd($request);
+
+        if ($request->post('password') !== $request->post('password_confirm')) {
+            $this->resource->setError('password_confirm', 'mismatch');
+        }
+    }
+
+    /**
+     * Additional validation rules to ensure user is authorized to edit this resource.
+     *
+     * @inheritdoc
+     */
+    protected function beforeUpdate(Request $request)
+    {
+        parent::beforeEdit($request);
+
+        if (!Crypt::hashCompare($this->user->password, $request->post('current_password'))) {
+            $this->resource->setError('current_password', 'mismatch');
+        }
+
+        if ($request->post('password') !== $request->post('password_confirm')) {
+            $this->resource->setError('password_confirm', 'mismatch');
+        }
+    }
+
+    /**
+     * Reloads current user info stored in the application session.
+     *
+     * @inheritdoc
+     */
+    protected function afterUpdate(Request $request)
+    {
+        parent::afterUpdate($request);
+
+        if (!$this->resource->hasErrors() && ($this->resource->id == $this->user->id)) {
+            Core\Session()->set('cms_user_info', rawurlencode(serialize($this->resource)));
+            $this->user = $this->resource;
         }
     }
 
@@ -125,21 +143,6 @@ class CMSUsers extends CMS
         }
 
         parent::beforeDelete($request);
-    }
-
-    /**
-     * Reloads current user info stored in the application session.
-     *
-     * @inheritdoc
-     */
-    protected function afterEdit(Request $request)
-    {
-        parent::afterEdit($request);
-
-        if ($request->is('post') && !$this->resource->hasErrors() && ($this->resource->id == $this->user->id)) {
-            Core\Session()->set('cms_user_info', rawurlencode(serialize($this->resource)));
-            $this->user = $this->resource;
-        }
     }
 
     /**

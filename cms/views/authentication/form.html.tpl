@@ -1,5 +1,5 @@
 <h1 class="text-center">{$_labels.login.title}</h1>
-<form action="{$smarty.server.REQUEST_URI}" method="post" role="form">
+<form action="{url for=authentication_login}" method="post" role="form">
     <div class="form-group">
         <label for="email"><i class="glyphicon glyphicon-user"></i> {$_labels.login.username}</label>
         <input name="email" type="email" id="email" class="form-control text-thin" placeholder="..." tabindex="1" value="{$smarty.post.email|escape|default:''}">
@@ -13,7 +13,7 @@
 {/if}
     <div class="form-group clearfix">
         <div class="text-center">
-            <label class="forgotten-password text-thin"><a href="{link_to controller=authentication action=reset}" tabindex="5">{$_labels.login.forgotten_password}</a></label>
+            <label class="forgotten-password text-thin"><a href="{url for=authentication_reset_form}" tabindex="5">{$_labels.login.forgotten_password}</a></label>
         </div>
     </div>
     <div class="text-center">

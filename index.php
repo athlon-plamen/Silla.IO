@@ -14,14 +14,14 @@
 namespace Core;
 
 use Core;
-use Core\Modules\Router;
+use Core\Modules\Http;
 
 /**
  * Define Silla.IO application framework variables.
  */
 define(
-'SILLA_ENVIRONMENT',
-isset($_SERVER['HTTP_ENV_SILLA_ENVIRONMENT']) ? $_SERVER['HTTP_ENV_SILLA_ENVIRONMENT'] : 'development'
+    'SILLA_ENVIRONMENT',
+     isset($_SERVER['HTTP_ENV_SILLA_ENVIRONMENT']) ? $_SERVER['HTTP_ENV_SILLA_ENVIRONMENT'] : 'development'
 );
 
 /**
@@ -33,24 +33,26 @@ try {
     /**
      * Detect Silla.IO Mode.
      */
-    $requestString = Router\Router::normalizePath($_SERVER['REQUEST_URI']);
-    $mode = Router\Router::getMode($requestString);
+    $requestString = Http\Router::normalizePath($_SERVER['REQUEST_URI']);
+    $mode = Http\Router::getMode($requestString);
     Config()->setMode($mode);
 
     /**
      * Setup Router variables.
      */
-    $routes  = new Router\Routes($mode);
-    $request = new Router\Request($mode, Router\Router::parseRequestQueryString($requestString, $routes), $GLOBALS);
+    $namespace = $mode['namespace'];
+    $routes = "\\{$namespace}\\Configuration\\Routes";
+    $routes  = new $routes();
+    $request = new Http\Request($mode, $requestString, $GLOBALS);
 
     /**
      * Dispatch Request.
      */
-    Core\Router()->dispatch($request, $routes);
+    Core\Router()->dispatch($request, $routes->getAll());
 
 } catch(\Exception $e) {
     if (!Core\Router()->response) {
-        Core\Router()->response = new Modules\Router\Response;
+        Core\Router()->response = new Modules\Http\Response;
     }
 
     if (!Core\Router()->response->hasContent()) {

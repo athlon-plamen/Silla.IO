@@ -5,7 +5,7 @@
         </a>
         <ul class="dropdown-menu">
             <li class="text-center">
-              <a href="{link_to controller=account}" title="{$user->name|escape}">
+              <a href="{url resource=$user action=edit}" title="{$user->name|escape}">
                   <img src="{$user->getAvatar(75)}" class="img-circle" alt="{$user->name|escape}"/><br />
                   <strong>{$user->name}</strong><br />
                   <span class="font-size-smaller">
@@ -16,7 +16,7 @@
             </li>
             <li class="divider"></li>
             <li>
-                <a href="{link_to controller=account}"><i class="glyphicon glyphicon-user"></i> {$_labels.modules.account.index}</a>
+                <a href="{url resource=$resource action=edit}"><i class="glyphicon glyphicon-user"></i> {$_labels.modules.account.index}</a>
             </li>
             {if {user_can controller=account action=credentials}}
             <li>
@@ -25,7 +25,7 @@
             {/if}
             <li class="divider"></li>
             <li>
-                <a href="{link_to controller=authentication action=logout}"><i class="glyphicon glyphicon-off"></i> {$_labels.sections.logout}</a>
+                <a href="{url for='authentication_logout'}"><i class="glyphicon glyphicon-off"></i> {$_labels.sections.logout}</a>
             </li>
         </ul>
     </li>

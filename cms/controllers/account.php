@@ -13,7 +13,7 @@ namespace CMS\Controllers;
 
 use Core;
 use Core\Base;
-use Core\Modules\Router\Request;
+use Core\Modules\Http\Request;
 use CMS\Models;
 use CMS\Helpers;
 
@@ -44,23 +44,20 @@ class Account extends CMSUsers
         parent::__construct();
 
         $this->addBeforeFilters(array('assignCurrentUserAsResource'));
+        $this->addBeforeFilters(array('restrictManageCredentials'), array('only' => array('edit', 'update')));
     }
 
     /**
-     * Account action.
+     * Restrict Credentials Management.
      *
-     * Prevent credentials management on action.
-     * 
-     * @param Request $request Current router request.
+     * @param \Core\Modules\Http\Request $request Current Http Request.
      *
      * @return void
      */
-    public function index(Request $request)
+    protected function restrictCredentialsManagement(Request $request)
     {
         $this->removeAccessibleAttributes(array_keys($this->sections['credentials']['fields']));
         unset($this->sections['credentials'], $this->sections['general']['fields']['role_id']);
-
-        $this->edit($request);
     }
 
     /**
@@ -73,7 +70,7 @@ class Account extends CMSUsers
     protected function assignCurrentUserAsResource(Request $request)
     {
         if (in_array($request->action(), array('edit', 'delete', 'show', 'export'), true)) {
-            $request->redirectTo('index');
+            $request->redirectTo('CMSAccount.edit');
         }
 
         $this->resource = $this->user;

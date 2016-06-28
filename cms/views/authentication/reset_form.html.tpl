@@ -1,5 +1,5 @@
 <h1>{$_labels.reset.title}</h1>
-<form action="{$smarty.server.REQUEST_URI}" method="post" autocomplete="off">
+<form action="{url for=authentication_reset}" method="post" autocomplete="off">
     <fieldset>
         <div class="form-group clearfix">
             <input name="email" type="email" id="email" class="form-control text-thin" placeholder="{$_labels.reset.email|escape}" value="{$smarty.post.email|escape|default:''}" />

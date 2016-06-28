@@ -12,7 +12,7 @@
 namespace CMS\Controllers;
 
 use Core;
-use Core\Modules\Router\Request;
+use Core\Modules\Http\Request;
 use CMS\Models;
 use CMS\Helpers;
 
@@ -50,7 +50,7 @@ abstract class CMS extends Core\Base\Resource
         parent::__construct();
 
         $this->addBeforeFilters(array('checkLogged'));
-        $this->addBeforeFilters(array('checkPermissions'), array('except' => $this->skipAclFor));
+       // $this->addBeforeFilters(array('checkPermissions'), array('except' => $this->skipAclFor));
         $this->addBeforeFilters(array('loadVendorAssets'));
 
         $this->addBeforeFilters(array('loadFormAssets'), array(
@@ -104,7 +104,7 @@ abstract class CMS extends Core\Base\Resource
         if (!Helpers\CMSUsers::userCan(array('controller' => $controller, 'action' => $action))) {
             Helpers\FlashMessage::set($this->labels['general']['no_access'], 'danger');
 
-            $request->redirectTo(array('controller' => 'account'));
+            $request->redirectTo('CMSUser.edit');
         }
 
         return true;

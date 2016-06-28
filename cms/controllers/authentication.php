@@ -14,7 +14,7 @@ namespace CMS\Controllers;
 use Core;
 use Core\Base;
 use Core\Modules\Crypt\Crypt;
-use Core\Modules\Router\Request;
+use Core\Modules\Http\Request;
 use CMS\Models;
 use CMS\Helpers;
 
@@ -61,56 +61,68 @@ class Authentication extends Base\Controller
     }
 
     /**
-     * Login action.
-     *
-     * Updates the user login time.
+     * Render login form action.
      *
      * @param Request $request Current router request.
      *
      * @return void
      */
+    public function form(Request $request)
+    {
+        if (Core\Session()->get('cms_user_logged') === 1) {
+            $user = unserialize(rawurldecode(Core\Session()->get('cms_user_info')));
+            $request->redirectTo(array('resource' => $user, 'action' => 'edit'));
+        }
+    }
+
+    /**
+     * Login action.
+     *
+     * Updates the user login time.
+     *
+     * @param \Core\Modules\Http\Request $request
+     *
+     * @return void
+     */
     public function login(Request $request)
     {
-        if ($request->is('post')) {
-            if ($this->captcha) {
-                if (!Helpers\Captcha::isValid($this->captcha)) {
-                    Helpers\FlashMessage::set($this->labels['captcha']['error'], 'danger');
-                    return;
-                }
+        $this->renderer->setView('authentication/form');
+
+        if ($this->captcha) {
+            if (!Helpers\Captcha::isValid($this->captcha)) {
+                Helpers\FlashMessage::set($this->labels['captcha']['error'], 'danger');
+                return;
             }
+        }
 
-            $user = Models\CMSUser::find()->where('email = ?', array($request->post('email')))->first();
+        $user = Models\CMSUser::find()->where('email = ?', array($request->post('email')))->first();
 
-            if ($user && Crypt::hashCompare($user->password, $request->post('password'))) {
-                $user->save(array('login_on' => gmdate('Y-m-d H:i:s')), true);
+        if ($user && Crypt::hashCompare($user->password, $request->post('password'))) {
+            $user->save(array('login_on' => gmdate('Y-m-d H:i:s')), true);
 
-                /* Regenerate Session key for prevent session id fixation. */
-                Core\Session()->regenerateKey();
-                Core\Session()->set('cms_user_info', rawurlencode(serialize($user)));
-                Core\Session()->set('cms_user_logged', 1);
-                Core\Session()->remove('authentication_error');
-                Core\Session()->remove('captcha');
+            /* Regenerate Session key for prevent session id fixation. */
+            Core\Session()->regenerateKey();
+            Core\Session()->set('cms_user_info', rawurlencode(serialize($user)));
+            Core\Session()->set('cms_user_logged', 1);
+            Core\Session()->remove('authentication_error');
+            Core\Session()->remove('captcha');
 
-                /* Regenerate CSRF token for prevent token fixation. */
-                Core\Session()->remove('_token');
-                $request->regenerateToken();
+            /* Regenerate CSRF token for prevent token fixation. */
+            Core\Session()->remove('_token');
+            $request->regenerateToken();
 
-                if ($request->get('redirect')) {
-                    $request->redirectTo($request->get('redirect'));
-                } else {
-                    $request->redirectTo(array('controller' => 'account'));
-                }
+            if ($request->get('redirect')) {
+                $request->redirectTo($request->get('redirect'));
             } else {
-                Helpers\FlashMessage::set($this->labels['login']['error'], 'danger');
-                Core\Session()->set('authentication_error', true);
-
-                if (Core\Config()->CAPTCHA['enabled']) {
-                    $this->loadCaptcha(Core\Config()->CAPTCHA);
-                }
+                $request->redirectTo(array('resource' => $user, 'action' => 'edit'));
             }
         } else {
-            if (Core\Session()->get('cms_user_logged') === 1) {
-                $request->redirectTo(array('controller' => 'account'));
+
+            Helpers\FlashMessage::set($this->labels['login']['error'], 'danger');
+            Core\Session()->set('authentication_error', true);
+
+            if (Core\Config()->CAPTCHA['enabled']) {
+                $this->loadCaptcha(Core\Config()->CAPTCHA);
             }
         }
     }
@@ -132,67 +144,74 @@ class Authentication extends Base\Controller
     /**
      * Password reset action.
      *
-     * @param Request $request Current router request.
+     * @param Request $request Current Http Request.
      *
      * @return void
      */
+    public function reset_form(Request $request)
+    {
+    }
+
+    /**
+     * Verify the requested password reset process.
+     *
+     * @param \Core\Modules\Http\Request $request Current Http Request.
+     */
     public function reset(Request $request)
     {
-        if ($request->is('post')) {
-            $this->errors = array();
-            $user = new Models\CMSUser;
+        $this->renderer->setView('authentication/reset_form');
+        $user = new Models\CMSUser;
 
-            if ($this->captcha && !Helpers\Captcha::isValid($this->captcha)) {
-                $this->errors['captcha'] = true;
-            } elseif (filter_var($request->post('email'), FILTER_VALIDATE_EMAIL) === false) {
-                $this->errors['email'] = true;
-            } elseif (!($user = Models\CMSUser::find()->where('email = ?', array($request->post('email')))->first())) {
-                $this->errors['email'] = true;
+        if ($this->captcha && !Helpers\Captcha::isValid($this->captcha)) {
+            $this->errors['captcha'] = true;
+        } elseif (filter_var($request->post('email'), FILTER_VALIDATE_EMAIL) === false) {
+            $this->errors['email'] = true;
+        } elseif (!($user = Models\CMSUser::find()->where('email = ?', array($request->post('email')))->first())) {
+            $this->errors['email'] = true;
+        }
+
+        if (!$this->errors) {
+            $user->save(array('updated_on' => gmdate('Y-m-d H:i:s')), true);
+
+            $this->name = $user->name;
+            $this->password_reset_link = Core\Router()->toFullUrl(array(
+                'controller' => 'authentication',
+                'action'     => 'renew',
+                'id'         => sha1($user->password . Core\Config()->USER_AUTH['cookie_salt'] . $user->email),
+            ));
+
+            $mailForPasswordReset = array(
+                'from' => array(
+                    Core\Config()->MAILER['identity']['email'] => Core\Config()->MAILER['identity']['name']
+                ),
+                'to' => array(
+                    $user->email => $user->name
+                ),
+                'subject' => $this->labels['mails']['reset']['subject'],
+                'content' => $this->getPartialOutput('authentication/mails/password_reset'),
+            );
+
+            Core\Helpers\Mailer::send($mailForPasswordReset);
+            Helpers\FlashMessage::set($this->labels['reset']['success'], 'success');
+            Core\Session()->remove('authentication_error');
+            Core\Session()->remove('captcha');
+        } else {
+            if ($this->captcha) {
+                Helpers\FlashMessage::set($this->labels['captcha']['error'], 'danger');
+            } else {
+                Helpers\FlashMessage::set($this->labels['reset']['error'], 'danger');
             }
 
-            if (!$this->errors) {
-                $user->save(array('updated_on' => gmdate('Y-m-d H:i:s')), true);
+            Core\Session()->set('authentication_error', true);
 
-                $this->name = $user->name;
-                $this->password_reset_link = Core\Router()->toFullUrl(array(
-                    'controller' => 'authentication',
-                    'action'     => 'renew',
-                    'id'         => sha1($user->password . Core\Config()->USER_AUTH['cookie_salt'] . $user->email),
-                ));
-
-                $mailForPasswordReset = array(
-                    'from' => array(
-                        Core\Config()->MAILER['identity']['email'] => Core\Config()->MAILER['identity']['name']
-                    ),
-                    'to' => array(
-                        $user->email => $user->name
-                    ),
-                    'subject' => $this->labels['mails']['reset']['subject'],
-                    'content' => $this->getPartialOutput('authentication/mails/password_reset'),
-                );
-
-                Core\Helpers\Mailer::send($mailForPasswordReset);
-                Helpers\FlashMessage::set($this->labels['reset']['success'], 'success');
-                Core\Session()->remove('authentication_error');
-                Core\Session()->remove('captcha');
-            } else {
-                if ($this->captcha) {
-                    Helpers\FlashMessage::set($this->labels['captcha']['error'], 'danger');
-                } else {
-                    Helpers\FlashMessage::set($this->labels['reset']['error'], 'danger');
-                }
-
-                Core\Session()->set('authentication_error', true);
-
-                if (Core\Config()->CAPTCHA['enabled']) {
-                    $this->loadCaptcha(Core\Config()->CAPTCHA);
-                }
+            if (Core\Config()->CAPTCHA['enabled']) {
+                $this->loadCaptcha(Core\Config()->CAPTCHA);
             }
         }
     }
 
     /**
-     * Reset access action.
+     * Renew access action.
      *
      * @param Request $request Current router request.
      *
