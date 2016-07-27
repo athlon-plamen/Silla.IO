@@ -51,7 +51,7 @@ class Authentication extends Base\Controller
     public function __construct()
     {
         parent::__construct();
-
+        
         $this->addBeforeFilters(array('loadAssets'));
         $this->addAfterFilters(array('loadFlashMessage'));
 
